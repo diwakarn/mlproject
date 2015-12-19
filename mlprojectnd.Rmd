@@ -1,0 +1,113 @@
+---
+title: "Project Assignment Machine Learning  Course - ND"
+output: html_document
+date: "21 December  2015"
+---
+ 
+ 
+## Executive Summary
+ 
+
+As a part of  human activity recognition research a team has provided  a  Weight Lifting Exercises dataset   to investigate "how (well)" an activity was performed by the wearer. 
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.  The goal of this machine learning exercise was to predict the manner of doing the exercise. This assignment describes the steps used to build the model including exploratory data analysis,   creating  a model on the training data set with cross-validation. The model arrived at has been tested with the sample test data sets provided. Results have been summarized in this report. 
+
+
+##  Input Data analysis
+The training data is in the file pml-training.csv. 
+
+``` {r}
+library(caret)
+library(e1071)
+library(randomForest)
+library(corrplot)
+ f1 <- "c:/users/diwakarn/Desktop/Diwakar/rstuff/ml/pml-training.csv"
+ pmldf <-  read.csv(f1,header = TRUE, sep ="," )
+ 
+```
+Examination of the data frame shows that there are lot of columns with NA or with most of values being 0.
+So data has to  cleaned to remove such columns. The first 7 columns relate to descriptive information about the measurements and can be removed for building the prediction model.
+
+``` {r, results='markup'}
+#clean data and get useful columns 
+pmldf <- pmldf[,8:length(pmldf)]
+pmldf1 <- nearZeroVar(pmldf,saveMetrics = TRUE)
+pmldf2 <-pmldf[,!pmldf1$nzv]
+paste ("The number of rows and columns in the cleaned training data is")
+dim(pmldf2)
+ 
+```
+
+## Creating the training and cross validation data sets 
+The first step is to create the training data set and a cross validation data set from the cleaned data. 
+
+``` {r}
+#Create Training data sets and Cross Validation Data Set
+
+inTrain = createDataPartition(pmldf2$classe, p = 3/4)[[1]]
+training = pmldf2[ inTrain,]
+crossval = pmldf2[-inTrain,] 
+
+```
+Carrying out a  correlation between the prediction variables ...
+
+``` {r, results='markup'}
+#Correlation matrix for the training data set
+
+correlMatrix <- cor(training[,1:52])
+corrplot(correlMatrix,order = "AOE",type = "lower",method = "square")
+
+```
+
+
+The Correlation shows that there are strongly corelated variables and there is an opportunity to reduce the predictor variables
+
+## Building the Prediction Model  
+The prediction model is built using the training data using random forests and is then run against the crossval data set to evaluate fit using a confusion matrix. A varimp plot is also run to identify the mean accuracy and gini decreases. The 
+
+```{r, results='markup'}
+ 
+rfplm <-randomForest(classe~ ., data=training,importance =TRUE,proximity=TRUE,ntree=5000,preProcessing = "pca")
+varImpPlot(rfplm)
+# Cross Validation
+rfplmpred <- predict(rfplm,crossval)
+confusionMatrix(crossval$classe,rfplmpred)
+
+```
+Results of the confusion matrix shows that the accuracy is very high  @95% confidence interval .  
+
+
+## Running predictions against testing data 
+
+The test data is available in the pml-testing.csv data set. As in the training data set, there are many columns with NAs. Data cleanup is now done before carrying out the prediction and prediction is carried out. 
+
+
+``` {r, results ='markup'}
+
+f1 <- "c:/users/diwakarn/Desktop/Diwakar/rstuff/ml/pml-testing.csv"
+pmltdf <-  read.csv(f1,header = TRUE, sep ="," )
+pmltdf <- pmltdf[,8:length(pmltdf)]
+#Remove NA columns
+pmltdf2 <- pmltdf[, colSums(is.na(pmltdf)) != nrow(pmltdf)]
+rfplmpred <- predict(rfplm,pmltdf2)
+print(rfplmpred)
+
+```
+
+Generating answer files required for submission
+
+``` {r, results ='asis'}
+answer<- as.character(levels(rfplmpred))[rfplmpred]
+
+#pml_write_files = function(x){
+ # n = length(x)
+ # for(i in 1:n){
+ #   filename = paste0("problem_id_",i,".txt")
+ #   write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+ # }
+#}
+
+#pml_write_files(answer)
+
+```
+
